@@ -1,0 +1,94 @@
+from math import exp
+import matplotlib.pyplot as plt
+from typing import Sequence
+from dataclasses import dataclass
+
+# Creating a class to save up the data
+@dataclass(frozen=True)
+class MertonPortfolio:
+    mu: float
+    sigma: float
+    r: float
+    rho: float
+    horizon: float
+    gamma: float
+    epsilon: float = 1e-6
+
+    def excess(self) -> float:
+        return self.mu - self.r
+
+    def variance(self) -> float:
+        return self.sigma * self.sigma
+
+    def allocation(self) -> float:
+        return self.excess() / (self.gamma * self.variance())
+
+    def portfolio_return(self) -> float:
+        return self.r + self.allocation() * self.excess()
+
+    def nu(self) -> float:
+        return (self.rho - (1 - self.gamma) * self.portfolio_return()) / self.gamma
+
+    def f(self, time: float) -> float:
+        remaining: float = self.horizon - time
+        nu = self.nu()
+        if nu == 0:
+            ret = remaining + self.epsilon
+        else:
+            ret = (1 + (nu * self.epsilon - 1) * exp(-nu * remaining)) / nu
+        return ret
+
+    def fractional_consumption_rate(self, time: float) -> float:
+        return 1 / self.f(time)
+
+    def wealth_growth_rate(self, time: float) -> float:
+        return self.portfolio_return() - self.fractional_consumption_rate(time)
+
+    def expected_wealth(self, time: float) -> float:
+        base: float = exp(self.portfolio_return() * time)
+        nu = self.nu()
+        if nu == 0:
+            ret = base * (1 - time / (self.horizon + self.epsilon))
+        else:
+            ret = base * (1 - (1 - exp(-nu * time)) / (1 + (nu * self.epsilon - 1) * exp(-nu * self.horizon)))
+        return ret
+
+
+# Parameters
+mu = 0.1
+sigma = 0.1
+r = 0.02
+rho = 0.01
+horizon = 20.0
+gamma = 0.95
+
+# Create an instance of MertonPortfolio
+mp = MertonPortfolio(mu, sigma, r, rho, horizon, gamma)
+
+# Generate time steps
+intervals = 20
+time_steps = [i * horizon / intervals for i in range(intervals)]
+
+# Calculate values for plotting
+optimal_consumption_rate = [mp.fractional_consumption_rate(t) for t in time_steps]
+#print(optimal_consumption_rate)
+expected_wealth_growth = [mp.wealth_growth_rate(t) for t in time_steps]
+#print(expected_wealth_growth)
+expected_portfolio_return = [mp.portfolio_return()] * intervals
+y=print(expected_portfolio_return)
+
+plt.figure(figsize=(11, 7))
+
+# Plot all curves on the same graph
+plt.plot(time_steps, optimal_consumption_rate, 'b-', label='Fractional Consumption Rate')
+plt.plot(time_steps, expected_wealth_growth, 'g--', label='Expected Wealth Growth Rate')
+plt.plot(time_steps, expected_portfolio_return, 'r-.', label='Expected Portfolio Annual Return = 70.0%')
+
+# Plot settings
+plt.xlabel('Time in years')
+plt.ylabel('Annual Rate')
+plt.title('Portfolio Metrics Over Time')
+plt.legend(loc='upper left')
+plt.grid(True)
+
+plt.show()
